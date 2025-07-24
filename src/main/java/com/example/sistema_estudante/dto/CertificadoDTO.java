@@ -7,8 +7,9 @@ public class CertificadoDTO {
     // Campos que permanecem
     private Long id;
     private String titulo;
-    private double cargaHoraria; // Continuará aqui, mas será preenchida pelo backend
+    private double cargaHoraria;
     private String fotoBase64;
+    private String mimeType; // Campo para o tipo de arquivo
     private LocalDateTime dataEnvio;
     private LocalDateTime dataRevisao;
     private String observacoesProfessor;
@@ -18,7 +19,6 @@ public class CertificadoDTO {
     private Long professorRevisorId;
     private String professorRevisorNome;
 
-    // --- MUDANÇAS AQUI ---
     // Campo para ENVIAR dados (do frontend para o backend)
     private Long subcategoriaId; 
 
@@ -29,9 +29,6 @@ public class CertificadoDTO {
     public CertificadoDTO() {
     }
     
-    // Construtor pode ser removido ou simplificado, pois a montagem do DTO
-    // será feita no Service. Getters e Setters são o mais importante.
-
     // Getters e Setters (para todos os campos)
 
     public Long getId() {
@@ -64,6 +61,15 @@ public class CertificadoDTO {
 
     public void setFotoBase64(String fotoBase64) {
         this.fotoBase64 = fotoBase64;
+    }
+
+    // MÉTODOS GET/SET PARA O MIMETYPE (ADICIONADOS)
+    public String getMimeType() {
+        return mimeType;
+    }
+
+    public void setMimeType(String mimeType) {
+        this.mimeType = mimeType;
     }
 
     public LocalDateTime getDataEnvio() {
@@ -130,7 +136,6 @@ public class CertificadoDTO {
         this.professorRevisorNome = professorRevisorNome;
     }
 
-    // Getters e Setters para os novos campos
     public Long getSubcategoriaId() {
         return subcategoriaId;
     }

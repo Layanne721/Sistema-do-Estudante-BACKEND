@@ -48,8 +48,7 @@ public class CertificadoController {
     // ENDPOINTS PARA ALUNOS
     // =======================================================
     
-    /**
-     * Envia múltiplos certificados em lote, vinculados à mesma subcategoria.
+  
 
     @PostMapping("/enviar-em-lote")
     public ResponseEntity<?> enviarLotePorSubcategoria(
