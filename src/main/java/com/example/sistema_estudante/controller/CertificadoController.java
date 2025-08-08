@@ -2,7 +2,9 @@ package com.example.sistema_estudante.controller;
 
 import com.example.sistema_estudante.dto.*;
 import com.example.sistema_estudante.service.CertificadoService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -48,8 +50,6 @@ public class CertificadoController {
     // ENDPOINTS PARA ALUNOS
     // =======================================================
     
-  
-
     @PostMapping("/enviar-em-lote")
     public ResponseEntity<?> enviarLotePorSubcategoria(
             @RequestBody LotePorSubcategoriaDTO loteDTO,
@@ -122,6 +122,48 @@ public class CertificadoController {
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * NOVO ENDPOINT: Gera um certificado final de conclusão para o aluno.
+     */
+    @GetMapping("/gerar-declaracao-final")
+    public ResponseEntity<byte[]> gerarCertificadoFinal(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            byte[] pdfBytes = certificadoService.gerarCertificadoFinal(userDetails.getUsername());
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "certificado_conclusao.pdf");
+            headers.setContentLength(pdfBytes.length);
+
+            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * NOVO ENDPOINT: Gera um relatório PDF com todos os certificados do aluno.
+     */
+    @GetMapping("/meus/relatorio")
+    public ResponseEntity<byte[]> gerarRelatorioCertificados(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            byte[] pdfBytes = certificadoService.gerarRelatorioDeCertificados(userDetails.getUsername());
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "relatorio_certificados.pdf");
+            headers.setContentLength(pdfBytes.length);
+
+            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

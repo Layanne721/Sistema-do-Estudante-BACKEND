@@ -6,11 +6,19 @@ import com.example.sistema_estudante.repository.CertificadoRepository;
 import com.example.sistema_estudante.repository.ModalidadeRepository;
 import com.example.sistema_estudante.repository.SubcategoriaRepository;
 import com.example.sistema_estudante.repository.UsuarioRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+import org.xhtmlrenderer.pdf.ITextRenderer;
 
+import com.lowagie.text.*;
+import com.lowagie.text.pdf.PdfWriter;
+
+import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,16 +34,22 @@ public class CertificadoService {
     private final SubcategoriaRepository subcategoriaRepository;
     private final NotificacaoService notificacaoService;
 
+    // NOVO: INJEÇÃO DO TEMPLATE ENGINE DO THYMELEAF
+    private final TemplateEngine templateEngine;
+
+    @Autowired
     public CertificadoService(CertificadoRepository certificadoRepository,
                               UsuarioRepository usuarioRepository,
                               ModalidadeRepository modalidadeRepository,
                               SubcategoriaRepository subcategoriaRepository,
-                              NotificacaoService notificacaoService) {
+                              NotificacaoService notificacaoService,
+                              TemplateEngine templateEngine) {
         this.certificadoRepository = certificadoRepository;
         this.usuarioRepository = usuarioRepository;
         this.modalidadeRepository = modalidadeRepository;
         this.subcategoriaRepository = subcategoriaRepository;
         this.notificacaoService = notificacaoService;
+        this.templateEngine = templateEngine;
     }
 
     @Transactional(readOnly = true)
@@ -116,7 +130,6 @@ public class CertificadoService {
         return toCertificadoDTO(certificadoSalvo);
     }
 
-    // MÉTODO CORRIGIDO E RENOMEADO
     @Transactional
     public List<CertificadoDTO> salvarLotePorSubcategoria(LotePorSubcategoriaDTO loteDTO, String username) {
         Usuario usuario = getUsuarioAutenticado(username);
@@ -313,10 +326,89 @@ public class CertificadoService {
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado: " + userEmail));
     }
     
-    // Supondo que você tenha uma exceção customizada para recursos não encontrados
     public static class ResourceNotFoundException extends RuntimeException {
         public ResourceNotFoundException(String message) {
             super(message);
         }
+    }
+
+    // =======================================================
+    // NOVOS MÉTODOS PARA GERAÇÃO DE PDFs
+    // =======================================================
+    
+    // MÉTODO ORIGINAL DO RELATÓRIO (USANDO ITEXT DIRETAMENTE)
+    @Transactional(readOnly = true)
+    public byte[] gerarRelatorioDeCertificados(String userEmail) throws Exception {
+        Usuario usuario = getUsuarioAutenticado(userEmail);
+        List<Certificado> certificados = certificadoRepository.findByUsuario(usuario);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Document document = new Document();
+        PdfWriter.getInstance(document, baos);
+
+        document.open();
+        
+        Font titleFont = new Font(Font.HELVETICA, 18, Font.BOLD);
+        Paragraph title = new Paragraph("Relatório de Certificados de Atividades Complementares", titleFont);
+        title.setAlignment(Element.ALIGN_CENTER);
+        document.add(title);
+        document.add(new Paragraph("\n"));
+
+        Font studentFont = new Font(Font.HELVETICA, 14, Font.NORMAL);
+        Paragraph studentName = new Paragraph("Aluno: " + usuario.getNome(), studentFont);
+        document.add(studentName);
+        document.add(new Paragraph("\n"));
+
+        for (Certificado cert : certificados) {
+            Paragraph certTitle = new Paragraph("Título: " + cert.getTitulo());
+            certTitle.setFont(new Font(Font.HELVETICA, 12, Font.BOLD));
+            document.add(certTitle);
+
+            document.add(new Paragraph("Modalidade: " + cert.getSubcategoria().getModalidade().getNome()));
+            document.add(new Paragraph("Atividade: " + cert.getSubcategoria().getDescricao()));
+            document.add(new Paragraph("Carga Horária: " + cert.getCargaHoraria() + "h"));
+            document.add(new Paragraph("Status: " + cert.getStatus()));
+            document.add(new Paragraph("Data de Envio: " + cert.getDataEnvio()));
+
+            if (cert.getObservacoesProfessor() != null && !cert.getObservacoesProfessor().isEmpty()) {
+                document.add(new Paragraph("Observações do Professor: " + cert.getObservacoesProfessor()));
+            }
+
+            document.add(new Paragraph("\n"));
+        }
+
+        document.close();
+        return baos.toByteArray();
+    }
+
+    // MÉTODO ATUALIZADO DO CERTIFICADO FINAL (USANDO THYMELEAF)
+    @Transactional(readOnly = true)
+    public byte[] gerarCertificadoFinal(String userEmail) throws Exception {
+        Usuario usuario = getUsuarioAutenticado(userEmail);
+        ProgressoDTO progresso = calcularProgressoAluno(userEmail);
+
+        if (progresso.totalHorasValidadas() < progresso.metaHoras()) {
+            throw new IllegalStateException("A meta de horas ainda não foi atingida para gerar o certificado final.");
+        }
+
+        List<Certificado> certificadosAprovados = certificadoRepository.findByUsuarioAndStatus(usuario, CertificadoStatus.APROVADO);
+        
+        // 1. CRIA O CONTEXTO DO THYMELEAF
+        Context context = new Context();
+        context.setVariable("aluno", usuario);
+        context.setVariable("progresso", progresso);
+        context.setVariable("certificadosAprovados", certificadosAprovados);
+        
+        // 2. PROCESSA O TEMPLATE HTML COM OS DADOS
+        String htmlContent = templateEngine.process("certificado_conclusao", context);
+        
+        // 3. CONVERTE O HTML EM PDF COM O OPENPDF
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ITextRenderer renderer = new ITextRenderer();
+        renderer.setDocumentFromString(htmlContent);
+        renderer.layout();
+        renderer.createPDF(baos);
+
+        return baos.toByteArray();
     }
 }
