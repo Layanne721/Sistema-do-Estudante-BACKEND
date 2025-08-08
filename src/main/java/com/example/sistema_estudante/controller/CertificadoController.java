@@ -1,5 +1,7 @@
 package com.example.sistema_estudante.controller;
 
+// NENHUMA ALTERAÇÃO NECESSÁRIA NESTE ARQUIVO
+
 import com.example.sistema_estudante.dto.*;
 import com.example.sistema_estudante.service.CertificadoService;
 import org.springframework.http.HttpHeaders;
@@ -23,6 +25,7 @@ public class CertificadoController {
     public CertificadoController(CertificadoService certificadoService) {
         this.certificadoService = certificadoService;
     }
+    
 
     // =======================================================
     // ENDPOINTS DE CONSULTA
