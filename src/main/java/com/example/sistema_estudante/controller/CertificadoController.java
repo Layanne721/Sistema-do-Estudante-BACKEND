@@ -1,7 +1,5 @@
 package com.example.sistema_estudante.controller;
 
-// NENHUMA ALTERAÇÃO NECESSÁRIA NESTE ARQUIVO
-
 import com.example.sistema_estudante.dto.*;
 import com.example.sistema_estudante.service.CertificadoService;
 import org.springframework.http.HttpHeaders;
@@ -25,34 +23,19 @@ public class CertificadoController {
     public CertificadoController(CertificadoService certificadoService) {
         this.certificadoService = certificadoService;
     }
-    
-
-    // =======================================================
-    // ENDPOINTS DE CONSULTA
-    // =======================================================
-
-    /**
-     * Retorna a lista de todas as modalidades de atividades.
-     */
+     
     @GetMapping("/modalidades")
     public ResponseEntity<List<ModalidadeDTO>> getModalidades() {
         List<ModalidadeDTO> modalidades = certificadoService.listarModalidades();
         return ResponseEntity.ok(modalidades);
     }
 
-    /**
-     * Retorna a lista de subcategorias para uma modalidade específica.
-     */
     @GetMapping("/modalidades/{id}/subcategorias")
     public ResponseEntity<List<SubcategoriaDTO>> getSubcategoriasPorModalidade(@PathVariable Long id) {
         List<SubcategoriaDTO> subcategorias = certificadoService.listarSubcategoriasPorModalidade(id);
         return ResponseEntity.ok(subcategorias);
     }
 
-    // =======================================================
-    // ENDPOINTS PARA ALUNOS
-    // =======================================================
-    
     @PostMapping("/enviar-em-lote")
     public ResponseEntity<?> enviarLotePorSubcategoria(
             @RequestBody LotePorSubcategoriaDTO loteDTO,
@@ -61,14 +44,10 @@ public class CertificadoController {
             List<CertificadoDTO> salvos = certificadoService.salvarLotePorSubcategoria(loteDTO, userDetails.getUsername());
             return ResponseEntity.status(HttpStatus.CREATED).body(salvos);
         } catch (Exception e) {
-            // Retorna uma mensagem de erro clara para o front-end
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }
     }
-    
-    /**
-     * Envia um único certificado.
-     */
+     
     @PostMapping("/enviar")
     public ResponseEntity<CertificadoDTO> enviarCertificado(
             @RequestBody CertificadoDTO certificadoDTO,
@@ -77,9 +56,6 @@ public class CertificadoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(salvo);
     }
 
-    /**
-     * Retorna o progresso do aluno com base nas horas validadas.
-     */
     @GetMapping("/meus/progresso")
     public ResponseEntity<ProgressoDTO> getProgressoAluno(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -87,19 +63,13 @@ public class CertificadoController {
         return ResponseEntity.ok(progresso);
     }
 
-    /**
-     * Lista todos os certificados enviados pelo aluno autenticado.
-     */
     @GetMapping("/meus")
     public ResponseEntity<List<CertificadoDTO>> listarMeusCertificados(
             @AuthenticationPrincipal UserDetails userDetails) {
         List<CertificadoDTO> certificados = certificadoService.listarCertificadosDoAluno(userDetails.getUsername());
         return ResponseEntity.ok(certificados);
     }
-    
-    /**
-     * Permite que o aluno edite um certificado seu.
-     */
+     
     @PutMapping("/meus/{id}")
     public ResponseEntity<?> editarCertificado(
             @PathVariable Long id,
@@ -113,9 +83,6 @@ public class CertificadoController {
         }
     }
 
-    /**
-     * Permite que o aluno exclua um certificado seu.
-     */
     @DeleteMapping("/meus/{id}")
     public ResponseEntity<?> deletarCertificado(
             @PathVariable Long id,
@@ -128,55 +95,38 @@ public class CertificadoController {
         }
     }
 
-    /**
-     * NOVO ENDPOINT: Gera um certificado final de conclusão para o aluno.
-     */
     @GetMapping("/gerar-declaracao-final")
     public ResponseEntity<byte[]> gerarCertificadoFinal(
             @AuthenticationPrincipal UserDetails userDetails) {
         try {
             byte[] pdfBytes = certificadoService.gerarCertificadoFinal(userDetails.getUsername());
-
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
             headers.setContentDispositionFormData("attachment", "certificado_conclusao.pdf");
             headers.setContentLength(pdfBytes.length);
-
             return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
-
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    /**
-     * NOVO ENDPOINT: Gera um relatório PDF com todos os certificados do aluno.
-     */
     @GetMapping("/meus/relatorio")
     public ResponseEntity<byte[]> gerarRelatorioCertificados(
             @AuthenticationPrincipal UserDetails userDetails) {
         try {
             byte[] pdfBytes = certificadoService.gerarRelatorioDeCertificados(userDetails.getUsername());
-
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
             headers.setContentDispositionFormData("attachment", "relatorio_certificados.pdf");
             headers.setContentLength(pdfBytes.length);
-
             return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
-
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    // =======================================================
-    // ENDPOINTS PARA PROFESSORES
-    // =======================================================
+    // --- ENDPOINTS PARA PROFESSORES ---
 
-    /**
-     * Lista certificados pendentes de revisão para o professor autenticado.
-     */
     @GetMapping("/revisao/pendentes")
     public ResponseEntity<List<CertificadoDTO>> listarCertificadosParaRevisao(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -184,9 +134,6 @@ public class CertificadoController {
         return ResponseEntity.ok(certificados);
     }
 
-    /**
-     * Permite que um professor revise (aprovar ou rejeitar) um certificado.
-     */
     @PutMapping("/{id}/revisar")
     public ResponseEntity<CertificadoDTO> revisarCertificado(
             @PathVariable Long id,
@@ -199,5 +146,13 @@ public class CertificadoController {
                 revisaoDTO.observacoesProfessor()
         );
         return ResponseEntity.ok(atualizado);
+    }
+
+    // --- NOVO ENDPOINT PARA O HISTÓRICO ---
+    @GetMapping("/revisao/historico")
+    public ResponseEntity<List<CertificadoDTO>> getHistoricoRevisoesProfessor(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        List<CertificadoDTO> historico = certificadoService.listarCertificadosRevisadosPeloProfessor(userDetails.getUsername());
+        return ResponseEntity.ok(historico);
     }
 }

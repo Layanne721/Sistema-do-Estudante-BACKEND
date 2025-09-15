@@ -16,6 +16,7 @@ public class CertificadoDTO {
     private CertificadoStatus status;
     private Long usuarioId;
     private String usuarioNome;
+    private String usuarioMatricula; // Mantido para a funcionalidade de revisão
     private Long professorRevisorId;
     private String professorRevisorNome;
 
@@ -63,7 +64,6 @@ public class CertificadoDTO {
         this.fotoBase64 = fotoBase64;
     }
 
-    // MÉTODOS GET/SET PARA O MIMETYPE (ADICIONADOS)
     public String getMimeType() {
         return mimeType;
     }
@@ -119,6 +119,14 @@ public class CertificadoDTO {
     public void setUsuarioNome(String usuarioNome) {
         this.usuarioNome = usuarioNome;
     }
+    
+    public String getUsuarioMatricula() {
+        return usuarioMatricula;
+    }
+
+    public void setUsuarioMatricula(String usuarioMatricula) {
+        this.usuarioMatricula = usuarioMatricula;
+    }
 
     public Long getProfessorRevisorId() {
         return professorRevisorId;
@@ -160,3 +168,4 @@ public class CertificadoDTO {
         this.modalidadeNome = modalidadeNome;
     }
 }
+

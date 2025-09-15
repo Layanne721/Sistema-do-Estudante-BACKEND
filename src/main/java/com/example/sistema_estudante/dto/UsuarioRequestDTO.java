@@ -1,7 +1,7 @@
 package com.example.sistema_estudante.dto;
 
-import com.example.sistema_estudante.model.Perfil;
 import com.example.sistema_estudante.model.ModalidadeTipo;
+import com.example.sistema_estudante.model.Perfil;
 
 public class UsuarioRequestDTO {
     private String nome;
@@ -11,7 +11,9 @@ public class UsuarioRequestDTO {
     private String matricula;
     private String codigoDisciplina;
     private ModalidadeTipo tipoAtividadeGerenciada;
+    private String avatarUrl;
 
+    // Getters e Setters
     public String getNome() { return nome; }
     public void setNome(String nome) { this.nome = nome; }
     public String getEmail() { return email; }
@@ -26,4 +28,6 @@ public class UsuarioRequestDTO {
     public void setCodigoDisciplina(String codigoDisciplina) { this.codigoDisciplina = codigoDisciplina; }
     public ModalidadeTipo getTipoAtividadeGerenciada() { return tipoAtividadeGerenciada; }
     public void setTipoAtividadeGerenciada(ModalidadeTipo tipoAtividadeGerenciada) { this.tipoAtividadeGerenciada = tipoAtividadeGerenciada; }
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
 }

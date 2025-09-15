@@ -46,6 +46,7 @@ public class CertificadoService {
     private final SubcategoriaRepository subcategoriaRepository;
     private final NotificacaoService notificacaoService;
     private final TemplateEngine templateEngine;
+    private final GamificacaoService gamificacaoService;
 
     @Autowired
     public CertificadoService(CertificadoRepository certificadoRepository,
@@ -53,13 +54,15 @@ public class CertificadoService {
                               ModalidadeRepository modalidadeRepository,
                               SubcategoriaRepository subcategoriaRepository,
                               NotificacaoService notificacaoService,
-                              TemplateEngine templateEngine) {
+                              TemplateEngine templateEngine,
+                              GamificacaoService gamificacaoService) {
         this.certificadoRepository = certificadoRepository;
         this.usuarioRepository = usuarioRepository;
         this.modalidadeRepository = modalidadeRepository;
         this.subcategoriaRepository = subcategoriaRepository;
         this.notificacaoService = notificacaoService;
         this.templateEngine = templateEngine;
+        this.gamificacaoService = gamificacaoService;
     }
 
     private String converterPdfParaImagemBase64(String pdfBase64) {
@@ -261,6 +264,7 @@ public class CertificadoService {
         if (novoStatus == CertificadoStatus.APROVADO) {
             mensagem = "Seu certificado '" + certificado.getTitulo() + "' foi aprovado!";
             cor = "#28a745";
+            gamificacaoService.processarAprovacaoCertificado(certificado.getUsuario(), professor);
         } else if (novoStatus == CertificadoStatus.REPROVADO) {
             mensagem = "Seu certificado '" + certificado.getTitulo() + "' foi reprovado.";
             cor = "#dc3545";
@@ -285,6 +289,7 @@ public class CertificadoService {
         dto.setStatus(certificado.getStatus());
         dto.setUsuarioId(certificado.getUsuario().getId());
         dto.setUsuarioNome(certificado.getUsuario().getNome());
+        dto.setUsuarioMatricula(certificado.getUsuario().getMatricula());
 
         if (certificado.getProfessorRevisor() != null) {
             dto.setProfessorRevisorId(certificado.getProfessorRevisor().getId());
@@ -339,6 +344,21 @@ public class CertificadoService {
                 .map(this::toCertificadoDTO)
                 .collect(Collectors.toList());
     }
+    
+    // --- NOVO MÉTODO PARA O HISTÓRICO ---
+    @Transactional(readOnly = true)
+    public List<CertificadoDTO> listarCertificadosRevisadosPeloProfessor(String professorEmail) {
+        Usuario professor = getUsuarioAutenticado(professorEmail);
+        if (professor.getPerfil() != Perfil.PROFESSOR) {
+            throw new AccessDeniedException("Apenas professores podem acessar esta funcionalidade.");
+        }
+
+        List<Certificado> revisados = certificadoRepository.findByProfessorRevisorOrderByDataRevisaoDesc(professor);
+
+        return revisados.stream()
+                .map(this::toCertificadoDTO)
+                .collect(Collectors.toList());
+    }
 
     private Usuario getUsuarioAutenticado(String userEmail) {
         return usuarioRepository.findByEmail(userEmail)
@@ -351,10 +371,6 @@ public class CertificadoService {
         }
     }
 
-    // =======================================================
-    // MÉTODOS DE GERAÇÃO DE PDFS (SEM ALTERAÇÕES)
-    // =======================================================
-    
     @Transactional(readOnly = true)
     public byte[] gerarRelatorioDeCertificados(String userEmail) throws Exception {
         Usuario usuario = getUsuarioAutenticado(userEmail);
@@ -426,3 +442,4 @@ public class CertificadoService {
         return baos.toByteArray();
     }
 }
+

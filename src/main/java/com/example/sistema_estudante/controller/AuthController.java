@@ -1,10 +1,6 @@
 package com.example.sistema_estudante.controller;
 
-import com.example.sistema_estudante.dto.ForgotPasswordRequest; // Mantido para compatibilidade, mas o novo será usado
-import com.example.sistema_estudante.dto.LoginRequestDTO;
-import com.example.sistema_estudante.dto.LoginResponseDTO;
-import com.example.sistema_estudante.dto.ResetPasswordRequest;
-import com.example.sistema_estudante.dto.UsuarioRequestDTO;
+import com.example.sistema_estudante.dto.*;
 import com.example.sistema_estudante.model.Perfil;
 import com.example.sistema_estudante.model.Usuario;
 import com.example.sistema_estudante.security.JwtService;
@@ -14,7 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -38,13 +35,15 @@ public class AuthController {
     public ResponseEntity<?> registerUser(@RequestBody UsuarioRequestDTO request) {
         try {
             Usuario novoUsuario = usuarioService.criarUsuario(request);
+
+            if (request.getAvatarUrl() != null && !request.getAvatarUrl().isEmpty()) {
+                usuarioService.atualizarAvatarUrl(novoUsuario.getEmail(), request.getAvatarUrl());
+            }
+
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Usuário registrado com sucesso: " + novoUsuario.getEmail()));
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
+
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Erro ao registrar usuário: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
         }
     }
 
@@ -54,55 +53,49 @@ public class AuthController {
             Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.senha())
             );
-
             Usuario usuario = (Usuario) authentication.getPrincipal();
             String token = jwtService.generateToken(usuario);
+            String avatarUrlResponse = usuarioService.construirAvatarUrl(usuario);
 
             return ResponseEntity.ok(new LoginResponseDTO(
                 token,
                 usuario.getNome(),
                 usuario.getPerfil(),
-                usuario.getPerfil() == Perfil.PROFESSOR ? usuario.getTipoAtividadeGerenciada() : null
+                usuario.getPerfil() == Perfil.PROFESSOR ? usuario.getTipoAtividadeGerenciada() : null,
+                avatarUrlResponse
             ));
-        } catch (UsernameNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Credenciais inválidas."));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Credenciais inválidas."));
         }
     }
 
-    /**
-     * Endpoint para solicitar a recuperação de senha.
-     * URL corrigida para corresponder ao front-end.
-     */
-    @PostMapping("/recuperar-senha")
-    public ResponseEntity<?> recuperarSenha(@RequestBody ForgotPasswordRequest request) {
-        try {
-            usuarioService.requestPasswordReset(request.getEmail());
-            // Sempre retorna sucesso para não revelar se um e-mail existe no sistema.
-            return ResponseEntity.ok(Map.of("message", "Se um usuário com o e-mail informado existir, um link para redefinição de senha foi enviado."));
-        } catch (Exception e) {
-            // Log do erro real no servidor
-            System.err.println("Erro crítico no processo de recuperação de senha: " + e.getMessage());
-            // Retorna uma mensagem genérica para o usuário
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Ocorreu um erro interno. Tente novamente mais tarde."));
+    @GetMapping("/meu-perfil")
+    public ResponseEntity<PerfilDTO> getMeuPerfil(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
+        String email = userDetails.getUsername();
+        PerfilDTO perfilDTO = usuarioService.getPerfilDoUsuario(email);
+        return ResponseEntity.ok(perfilDTO);
     }
 
-    /**
-     * Endpoint para efetivamente redefinir a senha com um token válido.
-     */
-    @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+    @PutMapping("/meu-perfil/avatar")
+    public ResponseEntity<?> updateAvatar(@AuthenticationPrincipal UserDetails userDetails, @RequestBody Map<String, String> payload) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         try {
-            boolean success = usuarioService.resetPassword(request.getToken(), request.getNewPassword());
-            if (success) {
-                return ResponseEntity.ok(Map.of("message", "Senha redefinida com sucesso."));
-            } else {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Token inválido, expirado ou senha inválida."));
-            }
+            String userEmail = userDetails.getUsername();
+            String newAvatarUrl = payload.get("avatarUrl");
+            
+            usuarioService.atualizarAvatarUrl(userEmail, newAvatarUrl);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Avatar atualizado com sucesso", 
+                "avatarUrl", newAvatarUrl
+            ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Erro ao redefinir senha: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Falha ao atualizar o avatar."));
         }
     }
 }

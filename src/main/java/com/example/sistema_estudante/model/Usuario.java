@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+
 import java.io.Serial;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ public class Usuario implements UserDetails {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // ... (todos os seus campos existentes: nome, email, etc.)
     @Column(nullable = false)
     private String nome;
 
@@ -71,10 +73,29 @@ public class Usuario implements UserDetails {
     @Column(name = "reset_token_expires_at")
     private LocalDateTime resetTokenExpiresAt;
 
-    public Usuario() {
-    }
+    @Column(name = "avatar_filename")
+    private String avatarFilename;
 
-    // --- GETTERS E SETTERS ---
+    @Column(name = "xp")
+    private int xp = 0;
+
+    @Column(name = "nivel")
+    private int nivel = 1;
+    
+    // --- CAMPO ADICIONADO PARA PROFESSORES ---
+    @Column(name = "total_revisoes")
+    private int totalRevisoes = 0;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "usuario_medalhas",
+        joinColumns = @JoinColumn(name = "usuario_id"),
+        inverseJoinColumns = @JoinColumn(name = "medalha_id")
+    )
+    private Set<Medalha> medalhas = new HashSet<>();
+
+    public Usuario() {}
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getNome() { return nome; }
@@ -105,8 +126,19 @@ public class Usuario implements UserDetails {
     public void setResetToken(String resetToken) { this.resetToken = resetToken; }
     public LocalDateTime getResetTokenExpiresAt() { return resetTokenExpiresAt; }
     public void setResetTokenExpiresAt(LocalDateTime resetTokenExpiresAt) { this.resetTokenExpiresAt = resetTokenExpiresAt; }
+    public String getAvatarFilename() { return avatarFilename; }
+    public void setAvatarFilename(String avatarFilename) { this.avatarFilename = avatarFilename; }
+    public int getXp() { return xp; }
+    public void setXp(int xp) { this.xp = xp; }
+    public int getNivel() { return nivel; }
+    public void setNivel(int nivel) { this.nivel = nivel; }
+    public Set<Medalha> getMedalhas() { return medalhas; }
+    public void setMedalhas(Set<Medalha> medalhas) { this.medalhas = medalhas; }
 
- // Em Usuario.java
+
+    public int getTotalRevisoes() { return totalRevisoes; }
+    public void setTotalRevisoes(int totalRevisoes) { this.totalRevisoes = totalRevisoes; }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + this.perfil.name()));
@@ -123,8 +155,6 @@ public class Usuario implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
     @Override
     public boolean isEnabled() { return true; }
-
-    // --- Equals e HashCode ---
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -134,6 +164,6 @@ public class Usuario implements UserDetails {
     }
     @Override
     public int hashCode() {
-        return getClass().hashCode();
+        return id != null ? id.hashCode() : 0;
     }
 }
