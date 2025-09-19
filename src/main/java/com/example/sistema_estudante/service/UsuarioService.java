@@ -6,13 +6,17 @@ import com.example.sistema_estudante.dto.UsuarioRequestDTO;
 import com.example.sistema_estudante.model.Perfil;
 import com.example.sistema_estudante.model.Usuario;
 import com.example.sistema_estudante.repository.UsuarioRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,11 +26,21 @@ public class UsuarioService {
     private final PasswordEncoder passwordEncoder;
     private static final int META_XP_ALUNO = 200;
 
-    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+    // Dependências para a recuperação de senha
+    private final GmailEmailService emailService;
+    @Value("${app.frontend.url}")
+    private String frontendBaseUrl;
+
+    // Construtor completo com todas as dependências
+    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, GmailEmailService emailService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
     }
 
+    // ==========================================================
+    // == INÍCIO DO SEU CÓDIGO ORIGINAL (MANTIDO INTACTO) ==
+    // ==========================================================
     @Transactional
     public Usuario criarUsuario(UsuarioRequestDTO request) {
         if (usuarioRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -40,20 +54,16 @@ public class UsuarioService {
         novoUsuario.setPerfil(request.getPerfil());
         novoUsuario.setDataCadastro(LocalDate.now());
 
-        // --- LÓGICA DE AVATAR PADRÃO CORRIGIDA E MELHORADA ---
         if (request.getAvatarUrl() == null || request.getAvatarUrl().trim().isEmpty()) {
-            String nomeParaSeed = novoUsuario.getNome().replaceAll("\\s+", ""); 
+            String nomeParaSeed = novoUsuario.getNome().replaceAll("\\s+", "");
             if (request.getPerfil() == Perfil.PROFESSOR) {
-                // Para professores, usa o mesmo serviço (DiceBear) mas com um estilo diferente e mais profissional ('micah').
                 novoUsuario.setAvatarFilename("https://api.dicebear.com/8.x/micah/svg?seed=" + nomeParaSeed);
             } else {
-                // Mantém o estilo 'adventurer' para alunos.
                 novoUsuario.setAvatarFilename("https://api.dicebear.com/8.x/adventurer/svg?seed=" + nomeParaSeed);
             }
         } else {
             novoUsuario.setAvatarFilename(request.getAvatarUrl());
         }
-        // --- FIM DA LÓGICA DE AVATAR ---
 
         if (request.getPerfil() == Perfil.ALUNO) {
             novoUsuario.setMatricula(request.getMatricula());
@@ -64,7 +74,7 @@ public class UsuarioService {
 
         return usuarioRepository.save(novoUsuario);
     }
-    
+
     @Transactional(readOnly = true)
     public PerfilDTO getPerfilDoUsuario(String email) {
         Usuario usuario = usuarioRepository.findByEmail(email)
@@ -73,10 +83,9 @@ public class UsuarioService {
         Set<MedalhaDTO> medalhasDTO = usuario.getMedalhas().stream()
                 .map(m -> new MedalhaDTO(m.getNome(), m.getDescricao(), m.getImagemUrl()))
                 .collect(Collectors.toSet());
-        
+
         String avatarUrl = construirAvatarUrl(usuario);
 
-        // CORREÇÃO: Construtor ajustado para o novo PerfilDTO com 7 campos.
         return new PerfilDTO(
             usuario.getNome(),
             usuario.getEmail(),
@@ -92,7 +101,7 @@ public class UsuarioService {
     public void atualizarAvatarUrl(String email, String avatarUrl) {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado: " + email));
-        
+
         usuario.setAvatarFilename(avatarUrl);
         usuarioRepository.save(usuario);
     }
@@ -110,5 +119,49 @@ public class UsuarioService {
         }
         return null;
     }
-}
+    // ==========================================================
+    // == FIM DO SEU CÓDIGO ORIGINAL ==
+    // ==========================================================
 
+
+    // ==========================================================
+    // == INÍCIO DOS MÉTODOS DE RECUPERAÇÃO DE SENHA ==
+    // ==========================================================
+    @Transactional
+    public void requestPasswordReset(String email) {
+        Optional<Usuario> usuarioOptional = usuarioRepository.findByEmail(email);
+        if (usuarioOptional.isPresent()) {
+            Usuario usuario = usuarioOptional.get();
+            String token = UUID.randomUUID().toString();
+
+            usuario.setResetToken(token);
+            usuario.setResetTokenExpiresAt(LocalDateTime.now().plusHours(1));
+            usuarioRepository.save(usuario);
+
+            String resetLink = frontendBaseUrl + "/resetar-senha?token=" + token;
+
+            emailService.sendPasswordResetEmail(usuario.getEmail(), usuario.getNome(), resetLink);
+        }
+    }
+
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        Usuario usuario = usuarioRepository.findByResetToken(token)
+            .orElseThrow(() -> new RuntimeException("Token de redefinição inválido ou não encontrado."));
+
+        if (usuario.getResetTokenExpiresAt() == null || usuario.getResetTokenExpiresAt().isBefore(LocalDateTime.now())) {
+            usuario.setResetToken(null);
+            usuario.setResetTokenExpiresAt(null);
+            usuarioRepository.save(usuario);
+            throw new RuntimeException("Seu token de redefinição de senha expirou. Por favor, solicite um novo.");
+        }
+
+        usuario.setSenha(passwordEncoder.encode(newPassword));
+        usuario.setResetToken(null);
+        usuario.setResetTokenExpiresAt(null);
+        usuarioRepository.save(usuario);
+    }
+    // ==========================================================
+    // == FIM DOS MÉTODOS DE RECUPERAÇÃO DE SENHA ==
+    // ==========================================================
+}
